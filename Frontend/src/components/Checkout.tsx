@@ -1,9 +1,48 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+
+declare global {
+    interface Window {
+        Razorpay?: new (options: Record<string, unknown>) => {
+            open: () => void;
+        };
+    }
+}
+
+const loadRazorpayScript = (): Promise<boolean> => {
+    if (typeof window === 'undefined') {
+        return Promise.resolve(false);
+    }
+
+    if (window.Razorpay) {
+        return Promise.resolve(true);
+    }
+
+    return new Promise((resolve) => {
+        const scriptId = 'razorpay-checkout-script';
+        const existingScript = document.getElementById(scriptId) as HTMLScriptElement | null;
+
+        if (existingScript) {
+            existingScript.addEventListener('load', () => resolve(Boolean(window.Razorpay)), { once: true });
+            existingScript.addEventListener('error', () => resolve(false), { once: true });
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.id = scriptId;
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+        script.async = true;
+        script.onload = () => resolve(Boolean(window.Razorpay));
+        script.onerror = () => resolve(false);
+        document.body.appendChild(script);
+    });
+};
 
 export const CheckoutPage: React.FC = () => {
     const { cartItems, cartTotal, clearCart } = useCart();
+    const { token, user } = useAuth();
     const navigate = useNavigate();
     const [isProcessing, setIsProcessing] = useState(false);
 
@@ -30,17 +69,117 @@ export const CheckoutPage: React.FC = () => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handlePlaceOrder = (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsProcessing(true);
+    const saveOrderToDatabase = async (status: 'PAID' | 'PENDING') => {
+        if (!token || !user) {
+            throw new Error('Please log in before placing an order.');
+        }
 
-        // Simulate API call to process payment/order
-        setTimeout(() => {
+        const payload = {
+            userId: user.id,
+            totalAmount: finalTotal,
+            status,
+            items: cartItems.map((item) => ({
+                id: item.id,
+                name: item.name,
+                quantity: item.quantity,
+                price: item.priceInr,
+                total: item.priceInr * item.quantity,
+            })),
+        };
+
+        const response = await fetch('http://localhost:3001/orders', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to create order');
+        }
+
+        return response.json();
+    };
+
+    const completeCheckout = async (message: string, status: 'PAID' | 'PENDING') => {
+        try {
+            const order = await saveOrderToDatabase(status);
             setIsProcessing(false);
-            alert(`Order placed successfully! Order ID: #ORD-${Math.floor(Math.random() * 1000000)}`);
+            alert(`${message}\nOrder ID: ${order?.id ?? 'N/A'}`);
             clearCart();
-            navigate('/'); // Redirect to home or an order success page
-        }, 2000);
+            navigate('/account');
+        } catch (error) {
+            setIsProcessing(false);
+            console.error('Order creation failed:', error);
+            alert(error instanceof Error ? error.message : 'Order creation failed. Please contact support.');
+        }
+    };
+
+    const handlePlaceOrder = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!token || !user) {
+            alert('Please log in before placing an order.');
+            navigate('/login');
+            return;
+        }
+
+        if (paymentMethod === 'cod') {
+            setIsProcessing(true);
+            setTimeout(() => {
+                void completeCheckout('Order placed successfully! Cash on delivery selected.', 'PENDING');
+            }, 2000);
+            return;
+        }
+
+        const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID as string | undefined;
+
+        if (paymentMethod === 'upi' || paymentMethod === 'card') {
+            setIsProcessing(true);
+
+            const scriptReady = await loadRazorpayScript();
+
+            if (!scriptReady || !window.Razorpay || !razorpayKey) {
+                setIsProcessing(false);
+                alert('Razorpay is not configured yet. Add VITE_RAZORPAY_KEY_ID to your frontend .env file to enable live checkout.');
+                return;
+            }
+
+            const razorpay = new window.Razorpay({
+                key: razorpayKey,
+                amount: Math.round(finalTotal * 100),
+                currency: 'INR',
+                name: 'Suplis',
+                description: 'Supplement purchase',
+                handler: function () {
+                    void completeCheckout('Payment successful!', 'PAID');
+                },
+                prefill: {
+                    name: `${formData.firstName} ${formData.lastName}`.trim(),
+                    email: formData.email,
+                    contact: formData.phone,
+                },
+                notes: {
+                    address: formData.address,
+                    city: formData.city,
+                    state: formData.state,
+                    pinCode: formData.pinCode,
+                },
+                theme: {
+                    color: '#f59e0b',
+                },
+                modal: {
+                    ondismiss: () => {
+                        setIsProcessing(false);
+                    },
+                },
+            });
+
+            razorpay.open();
+        }
     };
 
     // If cart is empty, don't allow checkout

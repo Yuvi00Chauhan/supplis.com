@@ -10,3 +10,4 @@ export * from './single-vitamin-product.model';
 export * from './weight-management-product.model';
 export * from './cart.model';
 export * from './cart-item.model';
+export * from './address.model';

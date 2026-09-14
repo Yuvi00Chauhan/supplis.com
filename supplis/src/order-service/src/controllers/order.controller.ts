@@ -17,7 +17,8 @@ import {
   requestBody,
   response,
 } from '@loopback/rest';
-import {authenticate, STRATEGY} from 'loopback4-authentication';
+import {inject} from '@loopback/core';
+import {authenticate, STRATEGY, AuthenticationBindings, IAuthUser} from 'loopback4-authentication';
 import {Order} from '../models';
 import {OrderRepository} from '../repositories';
 
@@ -75,8 +76,18 @@ export class OrderController {
   })
   async find(
     @param.filter(Order) filter?: Filter<Order>,
+    @inject(AuthenticationBindings.CURRENT_USER) currentUser?: IAuthUser,
   ): Promise<Order[]> {
-    return this.orderRepository.find(filter);
+    // Enforce per-user visibility: only return orders for the authenticated user
+    const userId = currentUser?.id;
+    const mergedFilter: Filter<Order> = {...(filter ?? {})};
+
+    if (userId) {
+      const where = mergedFilter.where ? {and: [mergedFilter.where, {userId}]} : {userId};
+      mergedFilter.where = where as any;
+    }
+
+    return this.orderRepository.find(mergedFilter);
   }
 
   @authenticate(STRATEGY.BEARER)

@@ -68,7 +68,7 @@ export const ContactUs: React.FC = () => {
                                 </div>
                                 <div>
                                     <h4 className="text-lg font-bold text-gray-900">Call Us</h4>
-                                    <p className="text-gray-500">+91 11 1234 5678</p>
+                                    <p className="text-gray-500">+91 8882531764</p>
                                     <p className="text-sm text-gray-400 mt-1">Mon-Fri from 9am to 6pm</p>
                                 </div>
                             </div>

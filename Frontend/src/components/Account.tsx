@@ -1,31 +1,143 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { AddAddressModal } from './AddAddress.tsx';
+
+interface Order {
+    id: string;
+    createdAt?: string;
+    createdOn?: string;
+    totalAmount: number;
+    status: string;
+    description?: string;
+}
+
+interface Address {
+    id: string;
+    addressLine1: string;
+    addressLine2?: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    isDefault?: boolean;
+    phone?: string;
+}
 
 export const Account: React.FC = () => {
     const navigate = useNavigate();
-    const { user, isAuthenticated, loading, logout } = useAuth();
-    const [activeTab, setActiveTab] = useState('dashboard');
+    const { user, token, isAuthenticated, loading, logout } = useAuth();
 
+    const [activeTab, setActiveTab] = useState('dashboard');
+    const [orders, setOrders] = useState<Order[]>([]);
+    const [addresses, setAddresses] = useState<Address[]>([]);
+    const [dataLoading, setDataLoading] = useState<boolean>(true);
+    const [isAddressModalOpen, setIsAddressModalOpen] = useState<boolean>(false);
+
+    // Redirect unauthenticated users
     useEffect(() => {
         if (!loading && !isAuthenticated) {
             navigate('/login', { replace: true, state: { from: { pathname: '/account' } } });
         }
     }, [loading, isAuthenticated, navigate]);
 
+    // Function to re-fetch addresses after adding a new one via modal
+    const fetchAddresses = async () => {
+        if (!token) return;
+        try {
+            const addressResponse = await fetch('http://localhost:3000/user-addresses', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+            if (addressResponse.ok) {
+                const addressData = await addressResponse.json();
+                setAddresses(addressData);
+            }
+        } catch (err) {
+            console.error('Error fetching addresses:', err);
+        }
+    };
+
+    // Unified account data fetcher (Prevents ESLint set-state-in-effect errors)
+    useEffect(() => {
+        let isCancelled = false;
+
+        if (!isAuthenticated || !token) {
+            if (!loading) {
+                setDataLoading(false);
+            }
+            return;
+        }
+
+        const loadAccountData = async () => {
+            try {
+                // 1. Fetch Orders from Order Service (Port 3001)
+                const ordersResponse = await fetch('http://localhost:3001/orders', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
+                if (ordersResponse.ok && !isCancelled) {
+                    const ordersData = await ordersResponse.json();
+                    setOrders(ordersData);
+                }
+
+                // 2. Fetch Addresses from Auth Service (Port 3000)
+                const addressResponse = await fetch('http://localhost:3000/user-addresses', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
+                if (addressResponse.ok && !isCancelled) {
+                    const addressData = await addressResponse.json();
+                    setAddresses(addressData);
+                }
+            } catch (err) {
+                console.error('Error loading account data:', err);
+            } finally {
+                if (!isCancelled) {
+                    setDataLoading(false);
+                }
+            }
+        };
+
+        loadAccountData();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [isAuthenticated, token, loading]);
+
+    const handleDeleteAddress = async (addressId: string) => {
+        if (!token || !window.confirm('Are you sure you want to delete this address?')) return;
+
+        try {
+            const response = await fetch(`http://localhost:3000/user-addresses/${addressId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+
+            if (response.ok) {
+                setAddresses((prev) => prev.filter((addr) => addr.id !== addressId));
+            } else {
+                alert('Failed to delete address.');
+            }
+        } catch (err) {
+            console.error('Error deleting address:', err);
+        }
+    };
+
     const handleLogout = () => {
         logout();
         navigate('/login', { replace: true });
     };
 
-    // Dummy orders data (can be replaced with a fetch call to your orders endpoint)
-    const orders = [
-        { id: "SP-10923", date: "Aug 10, 2026", total: "₹4,599", status: "Delivered", item: "Whey Protein Isolate - 2kg" },
-        { id: "SP-10899", date: "Jul 25, 2026", total: "₹999", status: "Delivered", item: "Micronized Creatine - 250g" },
-        { id: "SP-11004", date: "Aug 12, 2026", total: "₹1,899", status: "Processing", item: "Pre-Workout Energy - 30 Servings" }
-    ];
-
-    if (loading) {
+    if (loading || dataLoading) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-gray-50">
                 <p className="text-gray-500 font-medium">Loading Account Details...</p>
@@ -36,6 +148,8 @@ export const Account: React.FC = () => {
     if (!isAuthenticated || !user) {
         return null;
     }
+
+    const latestOrder = orders.length > 0 ? orders[0] : null;
 
     return (
         <div className="bg-gray-50 min-h-screen pb-16 pt-8">
@@ -106,7 +220,7 @@ export const Account: React.FC = () => {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                     <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center">
                                         <div className="w-14 h-14 bg-gray-900 rounded-full flex items-center justify-center text-[#ff9900] mr-4 text-xl font-bold">
-                                            {user.name.charAt(0).toUpperCase()}
+                                            {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
                                         </div>
                                         <div>
                                             <h3 className="text-lg font-bold text-gray-900">{user.name}</h3>
@@ -116,7 +230,7 @@ export const Account: React.FC = () => {
                                     <div className="bg-gradient-to-br from-gray-900 to-gray-800 p-6 rounded-xl shadow-md text-white flex flex-col justify-center">
                                         <p className="text-gray-300 text-sm mb-1">Supplis Reward Points</p>
                                         <div className="flex items-end">
-                                            <span className="text-4xl font-bold text-[#ff9900]">{user.rewardPoints}</span>
+                                            <span className="text-4xl font-bold text-[#ff9900]">{user.rewardPoints ?? 0}</span>
                                             <span className="ml-2 mb-1 text-gray-400 text-sm">pts</span>
                                         </div>
                                     </div>
@@ -127,7 +241,13 @@ export const Account: React.FC = () => {
                                         <h3 className="text-lg font-bold text-gray-900">Recent Activity</h3>
                                         <button onClick={() => setActiveTab('orders')} className="text-sm text-[#ff9900] font-bold hover:underline">View All</button>
                                     </div>
-                                    <p className="text-gray-500 text-sm">Your latest order <strong className="text-gray-900">{orders[2].id}</strong> is currently <strong className="text-[#ff9900]">{orders[2].status}</strong>.</p>
+                                    {latestOrder ? (
+                                        <p className="text-gray-500 text-sm">
+                                            Your latest order <strong className="text-gray-900">#{latestOrder.id.slice(0, 8)}</strong> is currently <strong className="text-[#ff9900]">{latestOrder.status}</strong>.
+                                        </p>
+                                    ) : (
+                                        <p className="text-gray-500 text-sm">No recent order activity found.</p>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -139,34 +259,47 @@ export const Account: React.FC = () => {
                                     <h3 className="text-lg font-bold text-gray-900">Order History</h3>
                                 </div>
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-left border-collapse">
-                                        <thead>
-                                        <tr className="bg-gray-50 text-gray-500 text-sm border-b border-gray-100">
-                                            <th className="p-4 font-medium">Order ID</th>
-                                            <th className="p-4 font-medium">Date</th>
-                                            <th className="p-4 font-medium">Item Summary</th>
-                                            <th className="p-4 font-medium">Status</th>
-                                            <th className="p-4 font-medium">Total</th>
-                                        </tr>
-                                        </thead>
-                                        <tbody className="text-sm">
-                                        {orders.map((order, idx) => (
-                                            <tr key={idx} className="border-b border-gray-50 hover:bg-gray-50">
-                                                <td className="p-4 font-bold text-gray-900">{order.id}</td>
-                                                <td className="p-4 text-gray-500">{order.date}</td>
-                                                <td className="p-4 text-gray-700 truncate max-w-[200px]">{order.item}</td>
-                                                <td className="p-4">
-                                                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                                            order.status === 'Delivered' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-[#d98200]'
-                                                        }`}>
-                                                            {order.status}
-                                                        </span>
-                                                </td>
-                                                <td className="p-4 font-bold text-gray-900">{order.total}</td>
+                                    {orders.length === 0 ? (
+                                        <p className="p-6 text-gray-500 text-sm">No orders placed yet.</p>
+                                    ) : (
+                                        <table className="w-full text-left border-collapse">
+                                            <thead>
+                                            <tr className="bg-gray-50 text-gray-500 text-sm border-b border-gray-100">
+                                                <th className="p-4 font-medium">Order ID</th>
+                                                <th className="p-4 font-medium">Date</th>
+                                                <th className="p-4 font-medium">Summary</th>
+                                                <th className="p-4 font-medium">Status</th>
+                                                <th className="p-4 font-medium">Total</th>
                                             </tr>
-                                        ))}
-                                        </tbody>
-                                    </table>
+                                            </thead>
+                                            <tbody className="text-sm">
+                                            {orders.map((order) => {
+                                                const orderDate = order.createdAt || order.createdOn;
+                                                return (
+                                                    <tr key={order.id} className="border-b border-gray-50 hover:bg-gray-50">
+                                                        <td className="p-4 font-bold text-gray-900">#{order.id.slice(0, 8)}</td>
+                                                        <td className="p-4 text-gray-500">
+                                                            {orderDate ? new Date(orderDate).toLocaleDateString() : 'N/A'}
+                                                        </td>
+                                                        <td className="p-4 text-gray-700 truncate max-w-[200px]">
+                                                            {order.description || 'Order Checkout'}
+                                                        </td>
+                                                        <td className="p-4">
+                                                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                                                order.status === 'Completed' || order.status === 'Delivered'
+                                                                    ? 'bg-green-100 text-green-700'
+                                                                    : 'bg-orange-100 text-[#d98200]'
+                                                            }`}>
+                                                                {order.status}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-4 font-bold text-gray-900">₹{order.totalAmount}</td>
+                                                    </tr>
+                                                );
+                                            })}
+                                            </tbody>
+                                        </table>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -177,25 +310,41 @@ export const Account: React.FC = () => {
                                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                                     <div className="flex justify-between items-center mb-6">
                                         <h3 className="text-lg font-bold text-gray-900">Shipping Addresses</h3>
-                                        <button className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800 transition-colors">Add New</button>
+                                        <button
+                                            onClick={() => setIsAddressModalOpen(true)}
+                                            className="bg-gray-900 text-white text-sm px-4 py-2 rounded hover:bg-gray-800 transition-colors"
+                                        >
+                                            Add New
+                                        </button>
                                     </div>
 
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div className="border-2 border-[#ff9900] rounded-xl p-5 relative">
-                                            <span className="absolute -top-3 left-4 bg-[#ff9900] text-black text-xs font-bold px-2 py-1 rounded">Default</span>
-                                            <h4 className="font-bold text-gray-900 mb-2">{user.name}</h4>
-                                            <p className="text-gray-600 text-sm leading-relaxed mb-4">
-                                                123 Fitness Avenue, Sector 14<br />
-                                                Near Gymkhana Club<br />
-                                                New Delhi, Delhi - 110001
-                                            </p>
-                                            <p className="text-gray-900 text-sm font-medium mb-4">Phone: {user.phone}</p>
-                                            <div className="flex gap-3">
-                                                <button className="text-sm font-bold text-gray-900 hover:text-[#ff9900]">Edit</button>
-                                                <button className="text-sm font-bold text-red-500 hover:text-red-700">Delete</button>
-                                            </div>
+                                    {addresses.length === 0 ? (
+                                        <p className="text-gray-500 text-sm">No saved addresses found.</p>
+                                    ) : (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            {addresses.map((address) => (
+                                                <div key={address.id} className={`border-2 ${address.isDefault ? 'border-[#ff9900]' : 'border-gray-200'} rounded-xl p-5 relative`}>
+                                                    {address.isDefault && (
+                                                        <span className="absolute -top-3 left-4 bg-[#ff9900] text-black text-xs font-bold px-2 py-1 rounded">Default</span>
+                                                    )}
+                                                    <h4 className="font-bold text-gray-900 mb-2">{user.name}</h4>
+                                                    <p className="text-gray-600 text-sm leading-relaxed mb-4">
+                                                        {address.addressLine1}{address.addressLine2 ? `, ${address.addressLine2}` : ''}<br />
+                                                        {address.city}, {address.state} - {address.zipCode}
+                                                    </p>
+                                                    <p className="text-gray-900 text-sm font-medium mb-4">Phone: {address.phone || user.phone}</p>
+                                                    <div className="flex gap-3">
+                                                        <button
+                                                            onClick={() => handleDeleteAddress(address.id)}
+                                                            className="text-sm font-bold text-red-500 hover:text-red-700"
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -273,6 +422,13 @@ export const Account: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Modal for creating a new address */}
+            <AddAddressModal
+                isOpen={isAddressModalOpen}
+                onClose={() => setIsAddressModalOpen(false)}
+                onAddressAdded={fetchAddresses}
+            />
         </div>
     );
 };

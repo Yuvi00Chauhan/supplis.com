@@ -30,3 +30,4 @@ export * from './category-weight-management-product.controller';
 export * from './cart-cart-item.controller';
 export * from './user-signup.controller';
 export * from './user-info.controller';
+export * from './address.controller';
