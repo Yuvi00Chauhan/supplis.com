@@ -57,12 +57,25 @@ export class PaymentSessionController {
         'orderId and a positive amount are required.',
       );
     }
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      throw new HttpErrors.InternalServerError(
+        'Razorpay credentials are not configured on the payment service.',
+      );
+    }
 
-    const paymentOrder = await this.razorpay.orders.create({
-      amount: Math.round(request.amount * 100),
-      currency: request.currency ?? 'INR',
-      receipt: request.orderId,
-    });
+    const amount = Math.round(request.amount * 100) / 100;
+    const amountInPaise = Math.round(amount * 100);
+    let paymentOrder;
+    try {
+      paymentOrder = await this.razorpay.orders.create({
+        amount: Math.round(amount * 100),
+        currency: request.currency ?? 'INR',
+        receipt: request.orderId,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Razorpay rejected the payment order.';
+      throw new HttpErrors.BadGateway(`Unable to create Razorpay order: ${message}`);
+    }
     const tenantId =
       (currentUser as IAuthUser & {tenantId?: string}).tenantId ??
       '4750fdd9-12a8-47a6-a508-5dd2d95da9cc';
@@ -82,7 +95,9 @@ export class PaymentSessionController {
 
     const storedOrder = await this.ordersRepository.create({
       id: uuidv4(),
-      totalAmount: request.amount,
+      // The payment-service schema stores monetary amounts in the smallest
+      // currency unit, while the checkout request is expressed in rupees.
+      totalAmount: amountInPaise,
       currency: request.currency ?? 'INR',
       status: 'created',
       paymentGatewayId: paymentGateway.id,
@@ -90,6 +105,7 @@ export class PaymentSessionController {
       metaData: {
         applicationOrderId: request.orderId,
         razorpayOrderId: paymentOrder.id,
+        amountInRupees: amount,
         checkoutDetails: request.checkoutDetails ?? {},
       },
       tenantId,

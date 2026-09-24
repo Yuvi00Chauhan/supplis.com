@@ -85,6 +85,7 @@ export class OrderServiceApplication extends BootMixin(
       '/ping',
       '/orders',
       '/orders/{id}',
+      '/coupons/validate',
     ]);
 
     // Customize @loopback/rest-explorer configuration

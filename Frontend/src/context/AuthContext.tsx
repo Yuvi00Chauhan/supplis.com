@@ -39,6 +39,8 @@ export interface UserProfile {
     email: string;
     phone: string;
     rewardPoints: number;
+    role: string;
+    roles: string[];
 }
 
 interface AuthContextType {
@@ -93,6 +95,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 email: data.email || '',
                 phone: data.phone || '+91 98765 43210',
                 rewardPoints: data.rewardPoints ?? 450,
+                role: data.role || data.roles?.[0] || 'User',
+                roles: Array.isArray(data.roles) ? data.roles : [data.role || 'User'],
             };
 
             setUser(profile);

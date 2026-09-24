@@ -18,6 +18,7 @@ import CartPage from "./components/CartPage";
 import RegisterPage from "./components/RegisterPage";
 import LoginPage from "./components/LoginPage";
 import Checkout from "./components/Checkout";
+import AdminAddProduct from "./components/AminAddProduct";
 
 // IMPORT CART & AUTH CONTEXTS
 import { CartProvider, useCart } from "./context/CartContext";
@@ -35,6 +36,15 @@ const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
         return <Navigate to="/login" replace />;
     }
 
+    return children;
+};
+
+const AdminRoute = ({ children }: { children: React.ReactElement }) => {
+    const { user, loading } = useAuth();
+    if (loading) return <div className="min-vh-100" />;
+    if (!user || !user.roles.some((role) => ['Admin', 'Manager'].includes(role))) {
+        return <Navigate to="/" replace />;
+    }
     return children;
 };
 
@@ -132,6 +142,14 @@ export default function App() {
                                         <ProtectedRoute>
                                             <Checkout />
                                         </ProtectedRoute>
+                                    }
+                                />
+                                <Route
+                                    path="/admin"
+                                    element={
+                                        <AdminRoute>
+                                            <AdminAddProduct />
+                                        </AdminRoute>
                                     }
                                 />
                             </Routes>

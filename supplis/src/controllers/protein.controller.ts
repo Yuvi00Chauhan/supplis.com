@@ -40,7 +40,6 @@ export class ProteinController {
         'application/json': {
           schema: getModelSchemaRef(ProteinProduct, {
             title: 'NewProteinProduct',
-            exclude: ['id'],
           }),
         },
       },

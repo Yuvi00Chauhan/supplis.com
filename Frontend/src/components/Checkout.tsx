@@ -49,7 +49,7 @@ export const Checkout: React.FC = () => {
     const [couponSuccess, setCouponSuccess] = useState('');
 
     const [loading, setLoading] = useState(false);
-    const finalTotal = Math.max(0, cartTotal - discount);
+    const finalTotal = Math.max(0, Math.round((cartTotal - discount) * 100) / 100);
     const getAddressLine = (address: Address) => address.street || address.addressLine1 || '';
 
     // 1. Fetch saved addresses

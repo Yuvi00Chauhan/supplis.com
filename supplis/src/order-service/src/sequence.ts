@@ -42,6 +42,12 @@ export class MySequence implements SequenceHandler {
       // ignore
     }
 
+    if (request.method === 'OPTIONS') {
+      response.statusCode = 204;
+      response.end();
+      return;
+    }
+
     try {
       const route = this.findRoute(request);
 

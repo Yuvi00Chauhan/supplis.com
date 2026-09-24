@@ -12,7 +12,11 @@ import {
 } from '@sourceloop/payment-service';
 import {CoreComponent} from '@sourceloop/core';
 import {verify} from 'jsonwebtoken';
+import dotenv from 'dotenv';
+import path from 'path';
 import {MySequence} from './sequence';
+
+dotenv.config({path: path.resolve(__dirname, '../.env')});
 
 class BearerVerifierProvider implements Provider<VerifyFunction.BearerFn> {
   value(): VerifyFunction.BearerFn {

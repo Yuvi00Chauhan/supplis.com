@@ -40,7 +40,6 @@ export class PreworkoutController {
         'application/json': {
           schema: getModelSchemaRef(PreWorkoutProduct, {
             title: 'NewPreWorkoutProduct',
-            exclude: ['id'],
           }),
         },
       },

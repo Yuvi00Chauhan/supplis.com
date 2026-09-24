@@ -16,10 +16,10 @@ const BANNER_IMAGES = [
 
 // Tiered Coupon Codes
 const COUPONS = [
-    { minSpend: '₹1,500', discount: '5% OFF', code: 'SUPLIS1500', badgeClass: 'bg-primary' },
-    { minSpend: '₹2,500', discount: '10% OFF', code: 'SUPLIS2500', badgeClass: 'bg-success' },
-    { minSpend: '₹3,500', discount: '15% OFF', code: 'SUPLIS3500', badgeClass: 'bg-warning text-dark' },
-    { minSpend: '₹5,000', discount: '20% OFF', code: 'SUPLIS5000', badgeClass: 'bg-danger' },
+    { minSpend: '₹1,500', discount: '5% OFF', code: 'SUPLIS5', badgeClass: 'bg-primary' },
+    { minSpend: '₹2,500', discount: '10% OFF', code: 'SUPLIS10', badgeClass: 'bg-success' },
+    { minSpend: '₹3,500', discount: '15% OFF', code: 'SUPLIS15', badgeClass: 'bg-warning text-dark' },
+    { minSpend: '₹5,000', discount: '20% OFF', code: 'SUPLIS20', badgeClass: 'bg-danger' },
 ];
 
 // Featured Products with normalized data structure

@@ -1,11 +1,19 @@
 import {repository} from '@loopback/repository';
 import {get, param, HttpErrors} from '@loopback/rest';
-import {UserRepository} from '@sourceloop/authentication-service';
+import {
+  RoleRepository,
+  UserRepository,
+  UserTenantRepository,
+} from '@sourceloop/authentication-service';
 
 export class UserInfoController {
   constructor(
     @repository(UserRepository)
     public userRepository: UserRepository,
+    @repository(UserTenantRepository)
+    public userTenantRepository: UserTenantRepository,
+    @repository(RoleRepository)
+    public roleRepository: RoleRepository,
   ) {}
 
   @get('/auth/userinfo')
@@ -82,6 +90,12 @@ export class UserInfoController {
     }
 
     if (user) {
+      const userTenant = user.id
+        ? await this.userTenantRepository.findOne({where: {userId: user.id}})
+        : undefined;
+      const role = userTenant?.roleId
+        ? await this.roleRepository.findById(userTenant.roleId)
+        : undefined;
       const displayName =
         [user.firstName, user.lastName].filter(Boolean).join(' ') ||
         user.username ||
@@ -96,6 +110,8 @@ export class UserInfoController {
         email: user.email,
         phone: user.phone || '+91 98765 43210',
         rewardPoints: 450,
+        role: role?.name || 'User',
+        roles: role?.name ? [role.name] : ['User'],
       };
     }
 
@@ -111,6 +127,10 @@ export class UserInfoController {
         email: email || `${username}@example.com`,
         phone: payload.phone || '+91 98765 43210',
         rewardPoints: 450,
+        role: payload.role || 'User',
+        roles: Array.isArray(payload.roles)
+          ? payload.roles
+          : [payload.role || 'User'],
       };
     }
 

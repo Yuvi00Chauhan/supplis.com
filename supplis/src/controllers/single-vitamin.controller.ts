@@ -40,7 +40,6 @@ export class SingleVitaminController {
         'application/json': {
           schema: getModelSchemaRef(SingleVitaminProduct, {
             title: 'NewSingleVitaminProduct',
-            exclude: ['id'],
           }),
         },
       },

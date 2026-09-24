@@ -40,7 +40,6 @@ export class MultivitaminController {
         'application/json': {
           schema: getModelSchemaRef(MultivitaminProduct, {
             title: 'NewMultivitaminProduct',
-            exclude: ['id'],
           }),
         },
       },
