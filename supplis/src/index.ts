@@ -1,9 +1,9 @@
-import {ApplicationConfig, SupplisBackendApplication } from './application';
+﻿import {ApplicationConfig, SuplisBackendApplication } from './application';
 
 export * from './application';
 
 export async function main(options: ApplicationConfig = {}) {
-  const app = new SupplisBackendApplication(options);
+  const app = new SuplisBackendApplication(options);
   await app.boot();
   await app.start();
 

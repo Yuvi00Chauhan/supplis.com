@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 
 export const ContactUs: React.FC = () => {
     const [formData, setFormData] = useState({
@@ -55,7 +55,7 @@ export const ContactUs: React.FC = () => {
                                 </div>
                                 <div>
                                     <h4 className="text-lg font-bold text-gray-900">Email Us</h4>
-                                    <p className="text-gray-500">support@supplis.com</p>
+                                    <p className="text-gray-500">support@suplis.com</p>
                                 </div>
                             </div>
 

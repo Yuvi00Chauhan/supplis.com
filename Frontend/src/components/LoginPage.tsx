@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -39,7 +39,7 @@ export default function LoginPage() {
                 throw new Error(data.error?.message || data.message || 'Invalid username or password.');
             }
 
-            let token = data.accessToken || data.token;
+            let token = data.accessToken || data.access_token || data.token;
 
             // 2. Exchange Authorization Code for JWT Token if code is returned
             if (!token && data.code) {
@@ -56,12 +56,15 @@ export default function LoginPage() {
                 if (!tokenResponse.ok) {
                     throw new Error(tokenData.error?.message || tokenData.message || 'Failed to generate token.');
                 }
-                token = tokenData.accessToken || tokenData.token;
+                token = tokenData.accessToken || tokenData.access_token || tokenData.token;
             }
 
             // 3. Persist Token & Redirect User
             if (token) {
-                await login(token);
+                const profile = await login(token);
+                if (!profile) {
+                    throw new Error('Unable to verify the signed-in user.');
+                }
                 navigate(from, { replace: true });
             } else {
                 throw new Error('Authentication token missing from response.');
@@ -80,7 +83,7 @@ export default function LoginPage() {
                 {/* Header Section */}
                 <div className="flex flex-col items-center">
                     <h2 className="text-center text-3xl font-extrabold text-gray-900">
-                        Sign In to Supplis
+                        Sign In to Suplis
                     </h2>
                     <p className="mt-2 text-center text-sm text-gray-600">
                         Welcome back! Enter your details to continue.

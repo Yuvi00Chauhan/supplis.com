@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 export default function RegisterPage() {
@@ -76,7 +76,7 @@ export default function RegisterPage() {
 
                 <div className="flex flex-col items-center">
                     <h2 className="text-center text-3xl font-extrabold text-gray-900">
-                        Create a Supplis Account
+                        Create a Suplis Account
                     </h2>
                     <p className="mt-2 text-center text-sm text-gray-600">
                         Join to access premium supplements and manage your cart

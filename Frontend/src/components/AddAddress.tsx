@@ -13,6 +13,7 @@ export const AddAddressModal: React.FC<AddAddressModalProps> = ({ isOpen, onClos
     const [error, setError] = useState<string | null>(null);
 
     const [formData, setFormData] = useState({
+        name: '',
         addressLine1: '',
         addressLine2: '',
         city: '',
@@ -82,6 +83,21 @@ export const AddAddressModal: React.FC<AddAddressModalProps> = ({ isOpen, onClos
                             {error}
                         </div>
                     )}
+
+                    <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
+                            Full Name *
+                        </label>
+                        <input
+                            type="text"
+                            name="name"
+                            required
+                            placeholder="Name of the person receiving the order"
+                            value={formData.name}
+                            onChange={handleChange}
+                            className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#ff9900] outline-none text-sm"
+                        />
+                    </div>
 
                     <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">

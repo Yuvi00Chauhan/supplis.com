@@ -1,365 +1,444 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { useCart } from '../context/CartContext';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from "../context/AuthContext";
+import { useCart } from "../context/CartContext";
 
 declare global {
     interface Window {
-        Razorpay?: new (options: Record<string, unknown>) => {
-            open: () => void;
-        };
+        Razorpay: any;
     }
 }
 
-const loadRazorpayScript = (): Promise<boolean> => {
-    if (typeof window === 'undefined') {
-        return Promise.resolve(false);
-    }
+interface Address {
+    id: string;
+    name?: string;
+    street?: string;
+    addressLine1?: string;
+    addressLine2?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    isDefault?: boolean;
+    phone?: string;
+}
 
-    if (window.Razorpay) {
-        return Promise.resolve(true);
-    }
-
-    return new Promise((resolve) => {
-        const scriptId = 'razorpay-checkout-script';
-        const existingScript = document.getElementById(scriptId) as HTMLScriptElement | null;
-
-        if (existingScript) {
-            existingScript.addEventListener('load', () => resolve(Boolean(window.Razorpay)), { once: true });
-            existingScript.addEventListener('error', () => resolve(false), { once: true });
-            return;
-        }
-
-        const script = document.createElement('script');
-        script.id = scriptId;
-        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-        script.async = true;
-        script.onload = () => resolve(Boolean(window.Razorpay));
-        script.onerror = () => resolve(false);
-        document.body.appendChild(script);
-    });
-};
-
-export const CheckoutPage: React.FC = () => {
+export const Checkout: React.FC = () => {
+    const { user, token, isAuthenticated } = useAuth();
     const { cartItems, cartTotal, clearCart } = useCart();
-    const { token, user } = useAuth();
     const navigate = useNavigate();
-    const [isProcessing, setIsProcessing] = useState(false);
 
-    // Form state
-    const [formData, setFormData] = useState({
-        firstName: '',
-        lastName: '',
-        email: '',
-        phone: '',
-        address: '',
+    // Address State
+    const [addresses, setAddresses] = useState<Address[]>([]);
+    const [selectedAddressId, setSelectedAddressId] = useState<string>('');
+
+    // New Address Form State
+    const [newAddress, setNewAddress] = useState({
+        name: '',
+        street: '',
         city: '',
         state: '',
-        pinCode: '',
+        zipCode: '',
+        phone: ''
     });
+    const [isSavingAddress, setIsSavingAddress] = useState(false);
 
-    const [paymentMethod, setPaymentMethod] = useState('upi');
+    // Coupon State
+    const [couponCode, setCouponCode] = useState('');
+    const [discount, setDiscount] = useState(0);
+    const [couponError, setCouponError] = useState('');
+    const [couponSuccess, setCouponSuccess] = useState('');
 
-    // Calculate Shipping (Free over ₹2000, otherwise ₹99)
-    const shippingFee = cartTotal > 2000 || cartTotal === 0 ? 0 : 99;
-    const finalTotal = cartTotal + shippingFee;
+    const [loading, setLoading] = useState(false);
+    const finalTotal = Math.max(0, cartTotal - discount);
+    const getAddressLine = (address: Address) => address.street || address.addressLine1 || '';
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-    };
+    // 1. Fetch saved addresses
+    useEffect(() => {
+        const fetchAddresses = async () => {
+            try {
+                if (!isAuthenticated || !token) return;
 
-    const saveOrderToDatabase = async (status: 'PAID' | 'PENDING') => {
-        if (!token || !user) {
-            throw new Error('Please log in before placing an order.');
-        }
+                const response = await fetch('http://localhost:3000/user-addresses', {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
 
-        const payload = {
-            userId: user.id,
-            totalAmount: finalTotal,
-            status,
-            items: cartItems.map((item) => ({
-                id: item.id,
-                name: item.name,
-                quantity: item.quantity,
-                price: item.priceInr,
-                total: item.priceInr * item.quantity,
-            })),
+                if (!response.ok) {
+                    throw new Error('Failed to load saved addresses');
+                }
+
+                const data = await response.json();
+
+                if (Array.isArray(data)) {
+                    setAddresses(data);
+                    if (data.length > 0) {
+                        const defaultAddress = data.find((address: Address) => address.isDefault);
+                        setSelectedAddressId((defaultAddress || data[0]).id);
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to load addresses:', err);
+            }
         };
 
-        const response = await fetch('http://localhost:3001/orders', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(payload),
-        });
+        fetchAddresses();
+    }, [isAuthenticated, token]);
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(errorText || 'Failed to create order');
-        }
-
-        return response.json();
-    };
-
-    const completeCheckout = async (message: string, status: 'PAID' | 'PENDING') => {
-        try {
-            const order = await saveOrderToDatabase(status);
-            setIsProcessing(false);
-            alert(`${message}\nOrder ID: ${order?.id ?? 'N/A'}`);
-            clearCart();
-            navigate('/account');
-        } catch (error) {
-            setIsProcessing(false);
-            console.error('Order creation failed:', error);
-            alert(error instanceof Error ? error.message : 'Order creation failed. Please contact support.');
-        }
-    };
-
-    const handlePlaceOrder = async (e: React.FormEvent) => {
+    // Save New Address Function
+    const handleSaveAddress = async (e: React.FormEvent) => {
         e.preventDefault();
+        setIsSavingAddress(true);
 
-        if (!token || !user) {
-            alert('Please log in before placing an order.');
-            navigate('/login');
-            return;
-        }
-
-        if (paymentMethod === 'cod') {
-            setIsProcessing(true);
-            setTimeout(() => {
-                void completeCheckout('Order placed successfully! Cash on delivery selected.', 'PENDING');
-            }, 2000);
-            return;
-        }
-
-        const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID as string | undefined;
-
-        if (paymentMethod === 'upi' || paymentMethod === 'card') {
-            setIsProcessing(true);
-
-            const scriptReady = await loadRazorpayScript();
-
-            if (!scriptReady || !window.Razorpay || !razorpayKey) {
-                setIsProcessing(false);
-                alert('Razorpay is not configured yet. Add VITE_RAZORPAY_KEY_ID to your frontend .env file to enable live checkout.');
+        try {
+            if (!isAuthenticated || !token) {
+                navigate('/login', { replace: true, state: { from: { pathname: '/checkout' } } });
                 return;
             }
 
-            const razorpay = new window.Razorpay({
-                key: razorpayKey,
-                amount: Math.round(finalTotal * 100),
-                currency: 'INR',
-                name: 'Suplis',
-                description: 'Supplement purchase',
-                handler: function () {
-                    void completeCheckout('Payment successful!', 'PAID');
+            const response = await fetch('http://localhost:3000/user-addresses', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
                 },
-                prefill: {
-                    name: `${formData.firstName} ${formData.lastName}`.trim(),
-                    email: formData.email,
-                    contact: formData.phone,
-                },
-                notes: {
-                    address: formData.address,
-                    city: formData.city,
-                    state: formData.state,
-                    pinCode: formData.pinCode,
-                },
-                theme: {
-                    color: '#f59e0b',
-                },
-                modal: {
-                    ondismiss: () => {
-                        setIsProcessing(false);
-                    },
-                },
+                body: JSON.stringify(newAddress),
             });
 
-            razorpay.open();
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error?.message || 'Failed to save address');
+            }
+
+            // Append new address to list and select it
+            setAddresses([...addresses, data]);
+            setSelectedAddressId(data.id);
+
+            // Clear form fields
+            setNewAddress({ name: '', street: '', city: '', state: '', zipCode: '', phone: '' });
+            alert("Address saved successfully!");
+
+        } catch (err: any) {
+            alert(err.message || 'Failed to save address.');
+        } finally {
+            setIsSavingAddress(false);
         }
     };
 
-    // If cart is empty, don't allow checkout
-    if (cartItems.length === 0) {
-        return (
-            <div className="container py-5 min-vh-100 d-flex flex-column align-items-center justify-content-center text-center">
-                <div className="bg-white p-5 rounded-4 shadow-sm border" style={{ maxWidth: '500px' }}>
-                    <h2 className="fw-bold mb-3">Your cart is empty</h2>
-                    <p className="text-muted mb-4">You need to add some supplements to your stack before checking out.</p>
-                    <Link to="/categories" className="btn btn-warning btn-lg fw-bold w-100">
-                        Continue Shopping
-                    </Link>
-                </div>
-            </div>
-        );
-    }
+    // 2. Validate Coupon
+    const handleApplyCoupon = async () => {
+        setCouponError('');
+        setCouponSuccess('');
+        if (!couponCode.trim()) return;
+
+        try {
+            const response = await fetch('http://localhost:3001/coupons/validate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: couponCode, cartTotal }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error?.message || 'Invalid coupon');
+            }
+
+            setDiscount(data.discountAmount);
+            setCouponSuccess(`Applied! You saved ₹${data.discountAmount}`);
+        } catch (err: any) {
+            setCouponError(err.message);
+            setDiscount(0);
+        }
+    };
+
+    // 3. Initiate Payment Flow
+    const handleProceedToPay = async () => {
+        if (!selectedAddressId) {
+            alert('Please select or add a shipping address before proceeding.');
+            return;
+        }
+
+        setLoading(true);
+
+        try {
+            if (!isAuthenticated || !token) {
+                navigate('/login', { replace: true, state: { from: { pathname: '/checkout' } } });
+                return;
+            }
+
+            const orderPayload = {
+                addressId: selectedAddressId,
+                items: cartItems,
+                subtotal: cartTotal,
+                discountAmount: discount,
+                totalAmount: finalTotal,
+                ...(discount > 0 ? { couponCode } : {}),
+            };
+
+            const orderRes = await fetch('http://localhost:3001/orders', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify(orderPayload),
+            });
+            const orderData = await orderRes.json();
+
+            if (!orderRes.ok) throw new Error(orderData.error?.message || 'Failed to create order');
+
+            const payRes = await fetch('http://localhost:3002/payments/create-session', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    orderId: orderData.id,
+                    amount: finalTotal,
+                    currency: 'INR',
+                    checkoutDetails: {
+                        applicationOrderId: orderData.id,
+                        addressId: selectedAddressId,
+                        items: cartItems,
+                        subtotal: cartTotal,
+                        discountAmount: discount,
+                        couponCode: discount > 0 ? couponCode : undefined,
+                    },
+                }),
+            });
+            const payData = await payRes.json();
+
+            if (!payRes.ok) {
+                throw new Error(
+                    payData.error?.message ||
+                    payData.message ||
+                    'Failed to generate payment session',
+                );
+            }
+
+            const options = {
+                key: payData.keyId,
+                amount: payData.amount,
+                currency: payData.currency,
+                name: 'Supplis Store',
+                description: `Order #${orderData.id}`,
+                order_id: payData.razorpayOrderId,
+                handler: async function (response: any) {
+                    const confirmRes = await fetch('http://localhost:3002/payments/confirm', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Authorization: `Bearer ${token}`,
+                        },
+                        body: JSON.stringify({
+                            paymentOrderId: payData.paymentOrderId,
+                            razorpayOrderId: response.razorpay_order_id,
+                            razorpayPaymentId: response.razorpay_payment_id,
+                            razorpaySignature: response.razorpay_signature,
+                        }),
+                    });
+                    if (!confirmRes.ok) {
+                        throw new Error('Payment completed but could not be recorded.');
+                    }
+                    alert(`Payment Successful! Payment ID: ${response.razorpay_payment_id}`);
+                    clearCart();
+                    navigate('/account');
+                },
+                prefill: {
+                    name: user?.name || '',
+                    email: user?.email || '',
+                },
+                theme: { color: '#0d6efd' },
+            };
+
+            if (typeof window.Razorpay !== 'function') {
+                throw new Error(
+                    'Payment checkout is unavailable. Please disable ad blockers or refresh the page.',
+                );
+            }
+
+            const rzp = new window.Razorpay(options);
+            rzp.on('payment.failed', function (response: any) {
+                alert(`Payment Failed: ${response.error.description}`);
+            });
+            rzp.open();
+
+        } catch (err: any) {
+            alert(err.message || 'Payment initiation failed');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
-        <div className="bg-light min-vh-100 py-5">
-            <div className="container">
-                <h2 className="fw-bold mb-4">Secure Checkout</h2>
+        <div className="container py-5">
+            <h2 className="mb-4">Checkout</h2>
+            <div className="row g-4">
 
-                <form onSubmit={handlePlaceOrder}>
-                    <div className="row g-4">
-                        {/* LEFT COLUMN: Shipping & Payment Details */}
-                        <div className="col-lg-8">
-                            {/* Shipping Details Card */}
-                            <div className="card border-0 shadow-sm rounded-4 mb-4">
-                                <div className="card-body p-4">
-                                    <h5 className="fw-bold mb-4 border-bottom pb-2">1. Shipping Details</h5>
+                {/* Left Column: Address Selection & Creation */}
+                <div className="col-md-7">
+                    <div className="card p-4 shadow-sm h-100">
+                        <h4 className="mb-4">1. Shipping Address</h4>
 
-                                    <div className="row g-3">
-                                        <div className="col-md-6">
-                                            <label className="form-label fw-semibold">First Name</label>
-                                            <input required type="text" name="firstName" value={formData.firstName} onChange={handleInputChange} className="form-control bg-light" placeholder="John" />
-                                        </div>
-                                        <div className="col-md-6">
-                                            <label className="form-label fw-semibold">Last Name</label>
-                                            <input required type="text" name="lastName" value={formData.lastName} onChange={handleInputChange} className="form-control bg-light" placeholder="Doe" />
-                                        </div>
-                                        <div className="col-md-6">
-                                            <label className="form-label fw-semibold">Email Address</label>
-                                            <input required type="email" name="email" value={formData.email} onChange={handleInputChange} className="form-control bg-light" placeholder="john@example.com" />
-                                        </div>
-                                        <div className="col-md-6">
-                                            <label className="form-label fw-semibold">Phone Number</label>
-                                            <input required type="tel" name="phone" value={formData.phone} onChange={handleInputChange} className="form-control bg-light" placeholder="+91" />
-                                        </div>
-                                        <div className="col-12">
-                                            <label className="form-label fw-semibold">Full Address</label>
-                                            <input required type="text" name="address" value={formData.address} onChange={handleInputChange} className="form-control bg-light" placeholder="House/Flat No, Street, Landmark" />
-                                        </div>
-                                        <div className="col-md-5">
-                                            <label className="form-label fw-semibold">City</label>
-                                            <input required type="text" name="city" value={formData.city} onChange={handleInputChange} className="form-control bg-light" placeholder="New Delhi" />
-                                        </div>
-                                        <div className="col-md-4">
-                                            <label className="form-label fw-semibold">State</label>
-                                            <select required name="state" value={formData.state} onChange={handleInputChange} className="form-select bg-light">
-                                                <option value="">Choose...</option>
-                                                <option value="Delhi">Delhi</option>
-                                                <option value="Maharashtra">Maharashtra</option>
-                                                <option value="Karnataka">Karnataka</option>
-                                                <option value="Haryana">Haryana</option>
-                                                <option value="Punjab">Punjab</option>
-                                                {/* Add more states as needed */}
-                                            </select>
-                                        </div>
-                                        <div className="col-md-3">
-                                            <label className="form-label fw-semibold">PIN Code</label>
-                                            <input required type="text" name="pinCode" value={formData.pinCode} onChange={handleInputChange} className="form-control bg-light" placeholder="110001" />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Payment Method Card */}
-                            <div className="card border-0 shadow-sm rounded-4">
-                                <div className="card-body p-4">
-                                    <h5 className="fw-bold mb-4 border-bottom pb-2">2. Payment Method</h5>
-
-                                    <div className="d-flex flex-column gap-3">
-                                        <label className={`border rounded p-3 cursor-pointer d-flex align-items-center ${paymentMethod === 'upi' ? 'border-warning bg-warning bg-opacity-10' : ''}`}>
-                                            <input type="radio" name="payment" value="upi" checked={paymentMethod === 'upi'} onChange={(e) => setPaymentMethod(e.target.value)} className="form-check-input m-0 me-3" />
-                                            <div>
-                                                <span className="fw-bold d-block">UPI (GPay, PhonePe, Paytm)</span>
-                                                <small className="text-muted">Instant, secure payment via UPI app</small>
-                                            </div>
-                                        </label>
-
-                                        <label className={`border rounded p-3 cursor-pointer d-flex align-items-center ${paymentMethod === 'card' ? 'border-warning bg-warning bg-opacity-10' : ''}`}>
-                                            <input type="radio" name="payment" value="card" checked={paymentMethod === 'card'} onChange={(e) => setPaymentMethod(e.target.value)} className="form-check-input m-0 me-3" />
-                                            <div>
-                                                <span className="fw-bold d-block">Credit / Debit Card</span>
-                                                <small className="text-muted">Visa, MasterCard, RuPay</small>
-                                            </div>
-                                        </label>
-
-                                        <label className={`border rounded p-3 cursor-pointer d-flex align-items-center ${paymentMethod === 'cod' ? 'border-warning bg-warning bg-opacity-10' : ''}`}>
-                                            <input type="radio" name="payment" value="cod" checked={paymentMethod === 'cod'} onChange={(e) => setPaymentMethod(e.target.value)} className="form-check-input m-0 me-3" />
-                                            <div>
-                                                <span className="fw-bold d-block">Cash on Delivery (COD)</span>
-                                                <small className="text-muted">Pay at your doorstep (₹50 extra fee may apply)</small>
-                                            </div>
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* RIGHT COLUMN: Order Summary */}
-                        <div className="col-lg-4">
-                            <div className="card border-0 shadow-sm rounded-4 sticky-top" style={{ top: '80px' }}>
-                                <div className="card-body p-4">
-                                    <h5 className="fw-bold mb-4 border-bottom pb-2">Order Summary</h5>
-
-                                    <div className="d-flex flex-column gap-3 mb-4 max-h-50 overflow-auto">
-                                        {cartItems.map((item) => (
-                                            <div key={item.id} className="d-flex align-items-center gap-3">
-                                                <img src={item.imageUrl} alt={item.name} className="rounded border bg-light" style={{ width: '50px', height: '50px', objectFit: 'contain' }} />
-                                                <div className="flex-grow-1">
-                                                    <h6 className="mb-0 fw-semibold text-truncate" style={{ maxWidth: '150px' }} title={item.name}>{item.name}</h6>
-                                                    <small className="text-muted">Qty: {item.quantity}</small>
-                                                </div>
-                                                <span className="fw-bold">₹{item.priceInr * item.quantity}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    <ul className="list-group list-group-flush mb-4 border-top pt-3">
-                                        <li className="list-group-item d-flex justify-content-between align-items-center px-0 border-0 text-muted">
-                                            Subtotal
-                                            <span>₹{cartTotal.toLocaleString('en-IN')}</span>
-                                        </li>
-                                        <li className="list-group-item d-flex justify-content-between align-items-center px-0 border-0 text-muted">
-                                            Shipping
-                                            {shippingFee === 0 ? (
-                                                <span className="text-success fw-bold">FREE</span>
-                                            ) : (
-                                                <span>₹{shippingFee}</span>
-                                            )}
-                                        </li>
-                                        {shippingFee > 0 && (
-                                            <li className="list-group-item px-0 border-0 pt-0 pb-2">
-                                                <small className="text-success">Add ₹{(2001 - cartTotal).toLocaleString('en-IN')} more for free shipping!</small>
-                                            </li>
-                                        )}
-                                        <li className="list-group-item d-flex justify-content-between align-items-center px-0 border-top mt-2 pt-3">
-                                            <span className="fw-bold fs-5">Total</span>
-                                            <span className="fw-bold fs-4 text-warning" style={{ color: '#ff9900' }}>₹{finalTotal.toLocaleString('en-IN')}</span>
-                                        </li>
-                                    </ul>
-
-                                    <button
-                                        type="submit"
-                                        disabled={isProcessing}
-                                        className="btn btn-warning btn-lg w-100 fw-bold d-flex justify-content-center align-items-center gap-2"
+                        {/* Render saved addresses above the form IF they exist */}
+                        {addresses.length > 0 && (
+                            <div className="mb-4">
+                                <h5 className="mb-3 text-secondary">Select a Saved Address</h5>
+                                {addresses.map((addr) => (
+                                    <div
+                                        key={addr.id}
+                                        className={`form-check mb-3 border p-3 rounded cursor-pointer ${selectedAddressId === addr.id ? 'border-primary bg-light' : ''}`}
+                                        onClick={() => setSelectedAddressId(addr.id)}
+                                        style={{ cursor: 'pointer' }}
                                     >
-                                        {isProcessing ? (
-                                            <>
-                                                <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                                                Processing...
-                                            </>
-                                        ) : (
-                                            <>
-                                                Place Order (₹{finalTotal.toLocaleString('en-IN')})
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
-                                                    <path fillRule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z"/>
-                                                </svg>
-                                            </>
-                                        )}
-                                    </button>
+                                        <input
+                                            className="form-check-input ms-1 mt-2"
+                                            type="radio"
+                                            name="address"
+                                            id={addr.id}
+                                            checked={selectedAddressId === addr.id}
+                                            onChange={() => setSelectedAddressId(addr.id)}
+                                        />
+                                        <label className="form-check-label ms-3 w-100" htmlFor={addr.id} style={{ cursor: 'pointer' }}>
+                                            {addr.name && <strong className="d-block mb-1 fs-5">{addr.name}</strong>}
+                                            <span className={addr.name ? "d-block mb-1" : "d-block mb-1 fw-bold"}>
+                                                {getAddressLine(addr)}
+                                            </span>
+                                            <span className="text-muted">{addr.city}, {addr.state} - {addr.zipCode}</span>
+                                            <div className="text-muted mt-1"><small>Phone: {addr.phone}</small></div>
+                                        </label>
+                                    </div>
+                                ))}
+                                <hr className="mt-4 border-secondary opacity-25" />
+                            </div>
+                        )}
+
+                        {/* Always display the form right underneath */}
+                        <form onSubmit={handleSaveAddress} className="border p-4 rounded bg-light">
+                            <h5 className="mb-3">
+                                {addresses.length === 0 ? 'Add a Delivery Address' : 'Or Add a New Delivery Address'}
+                            </h5>
+
+                            <div className="mb-3">
+                                <label className="form-label small fw-bold text-muted mb-1">Full Name</label>
+                                <input type="text" className="form-control" required
+                                       placeholder="e.g. John Doe"
+                                       value={newAddress.name}
+                                       onChange={e => setNewAddress({...newAddress, name: e.target.value})}
+                                />
+                            </div>
+
+                            <div className="mb-3">
+                                <label className="form-label small fw-bold text-muted mb-1">Street Address</label>
+                                <input type="text" className="form-control" required
+                                       placeholder="House No, Building, Street"
+                                       value={newAddress.street}
+                                       onChange={e => setNewAddress({...newAddress, street: e.target.value})}
+                                />
+                            </div>
+                            <div className="row mb-3">
+                                <div className="col-6">
+                                    <label className="form-label small fw-bold text-muted mb-1">City</label>
+                                    <input type="text" className="form-control" required
+                                           value={newAddress.city}
+                                           onChange={e => setNewAddress({...newAddress, city: e.target.value})}
+                                    />
+                                </div>
+                                <div className="col-6">
+                                    <label className="form-label small fw-bold text-muted mb-1">State</label>
+                                    <input type="text" className="form-control" required
+                                           value={newAddress.state}
+                                           onChange={e => setNewAddress({...newAddress, state: e.target.value})}
+                                    />
                                 </div>
                             </div>
-                        </div>
+                            <div className="row mb-4">
+                                <div className="col-6">
+                                    <label className="form-label small fw-bold text-muted mb-1">Zip Code</label>
+                                    <input type="text" className="form-control" required
+                                           value={newAddress.zipCode}
+                                           onChange={e => setNewAddress({...newAddress, zipCode: e.target.value})}
+                                    />
+                                </div>
+                                <div className="col-6">
+                                    <label className="form-label small fw-bold text-muted mb-1">Phone Number</label>
+                                    <input type="text" className="form-control" required
+                                           value={newAddress.phone}
+                                           onChange={e => setNewAddress({...newAddress, phone: e.target.value})}
+                                    />
+                                </div>
+                            </div>
+
+                            <button type="submit" className="btn btn-outline-primary w-100" disabled={isSavingAddress}>
+                                {isSavingAddress ? 'Saving...' : 'Save Address'}
+                            </button>
+                        </form>
                     </div>
-                </form>
+                </div>
+
+                {/* Right Column: Order & Coupon Summary */}
+                <div className="col-md-5">
+                    <div className="card p-4 shadow-sm h-100">
+                        <h4 className="mb-4">2. Order Summary</h4>
+
+                        <div className="d-flex justify-content-between mb-3 text-muted">
+                            <span>Subtotal ({cartItems.length} items):</span>
+                            <span>₹{cartTotal}</span>
+                        </div>
+
+                        <div className="input-group mb-2">
+                            <input
+                                type="text"
+                                className="form-control"
+                                placeholder="Enter Coupon Code"
+                                value={couponCode}
+                                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                            />
+                            <button
+                                className="btn btn-outline-secondary"
+                                onClick={handleApplyCoupon}
+                                disabled={!couponCode || cartItems.length === 0}
+                            >
+                                Apply
+                            </button>
+                        </div>
+
+                        <div style={{ minHeight: '24px' }}>
+                            {couponError && <small className="text-danger">{couponError}</small>}
+                            {couponSuccess && <small className="text-success">{couponSuccess}</small>}
+                        </div>
+
+                        {discount > 0 && (
+                            <div className="d-flex justify-content-between text-success mb-3 fw-bold">
+                                <span>Discount Applied:</span>
+                                <span>-₹{discount}</span>
+                            </div>
+                        )}
+
+                        <hr className="my-4" />
+
+                        <div className="d-flex justify-content-between fw-bold fs-4 mb-4">
+                            <span>Total Payable:</span>
+                            <span>₹{finalTotal}</span>
+                        </div>
+
+                        <button
+                            className="btn btn-primary btn-lg w-100"
+                            onClick={handleProceedToPay}
+                            disabled={loading || cartItems.length === 0 || !selectedAddressId}
+                        >
+                            {loading ? (
+                                <span><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Processing...</span>
+                            ) : (
+                                `Proceed to Pay ₹${finalTotal}`
+                            )}
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     );
 };
 
-export default CheckoutPage;
+export default Checkout;

@@ -1,4 +1,4 @@
-import "../css/Footer.css";
+﻿import "../css/Footer.css";
 import { useNavigate } from "react-router-dom";
 function Footer() {
     const navigate = useNavigate();
@@ -18,7 +18,7 @@ function Footer() {
     return (
         <footer className="d-flex flex-wrap justify-content-between align-items-center py-2 border-top footer">
             <div className="company">
-                <p className="col-md-4 mb-0 text-white">&copy; {new Date().getFullYear()} Supplis.com Inc</p>
+                <p className="col-md-4 mb-0 text-white">&copy; {new Date().getFullYear()} Suplis.com Inc</p>
             </div>
 
             <ul className="nav col-md-4 justify-content-end">

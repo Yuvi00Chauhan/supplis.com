@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
@@ -37,7 +37,7 @@ function Navbar() {
             <div className="container-fluid d-flex align-items-center">
                 {/* Brand Logo */}
                 <NavLink id="navLogo" className="navbar-brand" to="/">
-                    Supplis.com
+                    Suplis.com
                 </NavLink>
 
                 {/* Mobile Hamburger Toggle Button (Added ms-auto here to push it right) */}
@@ -142,7 +142,7 @@ function Navbar() {
                     style={{
                         width: '60px',
                         height: '60px',
-                        backgroundColor: '#ff9900', // Supplis Orange
+                        backgroundColor: '#ff9900', // Suplis Orange
                         borderRadius: '50%',
                         textDecoration: 'none',
                         position: 'relative'

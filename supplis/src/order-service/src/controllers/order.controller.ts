@@ -16,6 +16,7 @@ import {
   del,
   requestBody,
   response,
+  HttpErrors,
 } from '@loopback/rest';
 import {inject} from '@loopback/core';
 import {authenticate, STRATEGY, AuthenticationBindings, IAuthUser} from 'loopback4-authentication';
@@ -38,16 +39,27 @@ export class OrderController {
     @requestBody({
       content: {
         'application/json': {
-          schema: getModelSchemaRef(Order, {
-            title: 'NewOrder',
-            exclude: ['id'],
-          }),
+          schema: {
+            type: 'object',
+            additionalProperties: true,
+          },
         },
       },
     })
-    order: Omit<Order, 'id'>,
+    order: Omit<Order, 'id' | 'userId'>,
+    @inject(AuthenticationBindings.CURRENT_USER) currentUser: IAuthUser,
   ): Promise<Order> {
-    return this.orderRepository.create(order);
+    if (!Array.isArray(order.items) || typeof order.totalAmount !== 'number') {
+      throw new HttpErrors.UnprocessableEntity(
+        'items and totalAmount are required to create an order.',
+      );
+    }
+
+    return this.orderRepository.create({
+      ...order,
+      userId: currentUser.id as string,
+      createdAt: new Date(),
+    });
   }
 
   @get('/orders/count')

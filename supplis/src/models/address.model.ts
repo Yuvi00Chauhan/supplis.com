@@ -11,9 +11,13 @@ export class Address extends Entity {
 
   @property({
     type: 'string',
-    required: true,
   })
-  addressLine1: string;
+  name?: string;
+
+  @property({
+    type: 'string',
+  })
+  street?: string;
 
   @property({
     type: 'string',
@@ -22,21 +26,18 @@ export class Address extends Entity {
 
   @property({
     type: 'string',
-    required: true,
   })
-  city: string;
+  city?: string;
 
   @property({
     type: 'string',
-    required: true,
   })
-  state: string;
+  state?: string;
 
   @property({
     type: 'string',
-    required: true,
   })
-  pinCode: string;
+  zipCode?: string;
 
   @property({
     type: 'boolean',
@@ -45,15 +46,13 @@ export class Address extends Entity {
 
   @property({
     type: 'string',
-    required: true,
   })
-  phone: string;
+  phone?: string;
 
   @property({
     type: 'string',
-    required: true,
   })
-  userId: string;
+  userId?: string;
 
   constructor(data?: Partial<Address>) {
     super(data);
@@ -61,7 +60,6 @@ export class Address extends Entity {
 }
 
 export interface AddressRelations {
-  // describe navigational properties here
 }
 
 export type AddressWithRelations = Address & AddressRelations;

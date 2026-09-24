@@ -1,4 +1,4 @@
-import {BootMixin} from '@loopback/boot';
+﻿import {BootMixin} from '@loopback/boot';
 import {ApplicationConfig} from '@loopback/core';
 import {
   RestExplorerBindings,
@@ -20,7 +20,7 @@ import {LocalPasswordStrategyFactoryProvider} from './providers/local-password-s
 
 export {ApplicationConfig};
 
-export class SupplisBackendApplication extends BootMixin(
+export class SuplisBackendApplication extends BootMixin(
   ServiceMixin(RepositoryMixin(RestApplication)),
 ) {
   constructor(options: ApplicationConfig = {}) {

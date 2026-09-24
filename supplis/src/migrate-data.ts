@@ -1,4 +1,4 @@
-import { SupplisBackendApplication } from './application';
+﻿import { SuplisBackendApplication } from './application';
 
 import aminos from './data/aminos.json';
 import creatines from './data/creatines.json';
@@ -24,7 +24,7 @@ import {
 } from './repositories';
 
 export async function seedData() {
-  const app = new SupplisBackendApplication();
+  const app = new SuplisBackendApplication();
   await app.boot();
 
   const categoryRepo = await app.getRepository(CategoryRepository);

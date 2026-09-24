@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Link } from 'react-router-dom';
 
 export const AboutUs: React.FC = () => {
@@ -11,7 +11,7 @@ export const AboutUs: React.FC = () => {
                         Fueling Your <span className="text-[#ff9900]">Fitness Journey</span>
                     </h1>
                     <p className="text-lg md:text-xl text-gray-300 mx-auto max-w-2xl">
-                        At Supplis.com, we believe that achieving your peak physical potential starts with the right nutrition. We are on a mission to provide India with 100% authentic, premium sports nutrition.
+                        At Suplis.com, we believe that achieving your peak physical potential starts with the right nutrition. We are on a mission to provide India with 100% authentic, premium sports nutrition.
                     </p>
                 </div>
             </div>
@@ -29,7 +29,7 @@ export const AboutUs: React.FC = () => {
                     <div className="order-1 md:order-2 md:px-8">
                         <h2 className="text-3xl font-bold mb-6 text-gray-900">Our Story</h2>
                         <p className="text-gray-600 mb-4 leading-relaxed">
-                            The supplement market is unfortunately crowded with counterfeit products and misleading claims. Supplis.com was born out of a simple frustration: <strong className="text-gray-900">it shouldn't be this hard to find genuine protein and vitamins.</strong>
+                            The supplement market is unfortunately crowded with counterfeit products and misleading claims. Suplis.com was born out of a simple frustration: <strong className="text-gray-900">it shouldn't be this hard to find genuine protein and vitamins.</strong>
                         </p>
                         <p className="text-gray-600 leading-relaxed">
                             We bypassed the middlemen to source directly from official brand manufacturers and authorized importers. Whether you're a professional bodybuilder, a weekend warrior, or just starting your health journey, we ensure that what you put into your body is safe, tested, and effective.
@@ -39,7 +39,7 @@ export const AboutUs: React.FC = () => {
 
 
                 <div className="text-center mb-12">
-                    <h2 className="text-3xl font-bold mb-3 text-gray-900">Why Choose Supplis?</h2>
+                    <h2 className="text-3xl font-bold mb-3 text-gray-900">Why Choose Suplis?</h2>
                     <p className="text-gray-500">No compromises. Just results.</p>
                 </div>
 

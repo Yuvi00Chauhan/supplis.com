@@ -29,9 +29,45 @@ export class Order extends Entity {
 
   @property({
     type: 'string',
+  })
+  addressId?: string;
+
+  @property({
+    type: 'number',
+    postgresql: {
+      dataType: 'numeric',
+      dataPrecision: 10,
+      dataScale: 2,
+    },
+  })
+  subtotal?: number;
+
+  @property({
+    type: 'number',
+    postgresql: {
+      dataType: 'numeric',
+      dataPrecision: 10,
+      dataScale: 2,
+    },
+  })
+  discountAmount?: number;
+
+  @property({
+    type: 'string',
+  })
+  couponCode?: string;
+
+  @property({
+    type: 'string',
     default: 'PENDING',
   })
   status?: string;
+
+  @property({
+    type: 'date',
+    defaultFn: 'now',
+  })
+  createdAt?: Date;
 
   @property({
     type: 'array',
