@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Link } from 'react-router-dom';
 
 export const Features: React.FC = () => {
@@ -66,7 +66,7 @@ export const Features: React.FC = () => {
             <div className="bg-gray-900 text-white py-16 border-b-4 border-[#ff9900]">
                 <div className="max-w-7xl mx-auto px-4 text-center">
                     <h1 className="text-4xl md:text-5xl font-bold mb-6">
-                        Why Shop With <span className="text-[#ff9900]">Supplis?</span>
+                        Why Shop With <span className="text-[#ff9900]">Suplis?</span>
                     </h1>
                     <p className="text-lg md:text-xl text-gray-300 mx-auto max-w-2xl">
                         We are more than just an e-commerce store. We are your dedicated training partner, built with features designed to make your fitness journey seamless.
@@ -106,7 +106,7 @@ export const Features: React.FC = () => {
                     <div className="relative z-10">
                         <h2 className="text-3xl md:text-4xl font-bold mb-4">Experience the Standard of Excellence</h2>
                         <p className="mb-8 text-gray-300 text-lg max-w-2xl mx-auto">
-                            Join thousands of athletes who trust Supplis.com for their daily nutrition. Don't compromise on your health.
+                            Join thousands of athletes who trust Suplis.com for their daily nutrition. Don't compromise on your health.
                         </p>
                         <Link
                             to="/categories"

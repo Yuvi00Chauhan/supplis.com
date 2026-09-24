@@ -14,7 +14,9 @@ interface Order {
 
 interface Address {
     id: string;
-    addressLine1: string;
+    name?: string;
+    street?: string;
+    addressLine1?: string;
     addressLine2?: string;
     city: string;
     state: string;
@@ -81,7 +83,17 @@ export const Account: React.FC = () => {
                 });
                 if (ordersResponse.ok && !isCancelled) {
                     const ordersData = await ordersResponse.json();
-                    setOrders(ordersData);
+                    setOrders(
+                        Array.isArray(ordersData)
+                            ? [...ordersData].sort((a, b) => {
+                                const first = new Date(a.createdAt || a.createdOn || 0).getTime();
+                                const second = new Date(b.createdAt || b.createdOn || 0).getTime();
+                                return second - first;
+                            })
+                            : [],
+                    );
+                } else if (!ordersResponse.ok) {
+                    console.error('Failed to load orders:', await ordersResponse.text());
                 }
 
                 // 2. Fetch Addresses from Auth Service (Port 3000)
@@ -228,7 +240,7 @@ export const Account: React.FC = () => {
                                         </div>
                                     </div>
                                     <div className="bg-gradient-to-br from-gray-900 to-gray-800 p-6 rounded-xl shadow-md text-white flex flex-col justify-center">
-                                        <p className="text-gray-300 text-sm mb-1">Supplis Reward Points</p>
+                                        <p className="text-gray-300 text-sm mb-1">Suplis Reward Points</p>
                                         <div className="flex items-end">
                                             <span className="text-4xl font-bold text-[#ff9900]">{user.rewardPoints ?? 0}</span>
                                             <span className="ml-2 mb-1 text-gray-400 text-sm">pts</span>
@@ -266,7 +278,7 @@ export const Account: React.FC = () => {
                                             <thead>
                                             <tr className="bg-gray-50 text-gray-500 text-sm border-b border-gray-100">
                                                 <th className="p-4 font-medium">Order ID</th>
-                                                <th className="p-4 font-medium">Date</th>
+                                                <th className="p-4 font-medium">Placed On</th>
                                                 <th className="p-4 font-medium">Summary</th>
                                                 <th className="p-4 font-medium">Status</th>
                                                 <th className="p-4 font-medium">Total</th>
@@ -279,7 +291,14 @@ export const Account: React.FC = () => {
                                                     <tr key={order.id} className="border-b border-gray-50 hover:bg-gray-50">
                                                         <td className="p-4 font-bold text-gray-900">#{order.id.slice(0, 8)}</td>
                                                         <td className="p-4 text-gray-500">
-                                                            {orderDate ? new Date(orderDate).toLocaleDateString() : 'N/A'}
+                                                            {orderDate ? (
+                                                                <>
+                                                                    <div>{new Date(orderDate).toLocaleDateString()}</div>
+                                                                    <div className="text-xs text-gray-400">
+                                                                        {new Date(orderDate).toLocaleTimeString()}
+                                                                    </div>
+                                                                </>
+                                                            ) : 'N/A'}
                                                         </td>
                                                         <td className="p-4 text-gray-700 truncate max-w-[200px]">
                                                             {order.description || 'Order Checkout'}
@@ -327,9 +346,9 @@ export const Account: React.FC = () => {
                                                     {address.isDefault && (
                                                         <span className="absolute -top-3 left-4 bg-[#ff9900] text-black text-xs font-bold px-2 py-1 rounded">Default</span>
                                                     )}
-                                                    <h4 className="font-bold text-gray-900 mb-2">{user.name}</h4>
+                                                    <h4 className="font-bold text-gray-900 mb-2">{address.name || user.name}</h4>
                                                     <p className="text-gray-600 text-sm leading-relaxed mb-4">
-                                                        {address.addressLine1}{address.addressLine2 ? `, ${address.addressLine2}` : ''}<br />
+                                                        {address.addressLine1 || address.street}{address.addressLine2 ? `, ${address.addressLine2}` : ''}<br />
                                                         {address.city}, {address.state} - {address.zipCode}
                                                     </p>
                                                     <p className="text-gray-900 text-sm font-medium mb-4">Phone: {address.phone || user.phone}</p>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 export const FAQs: React.FC = () => {
@@ -28,7 +28,7 @@ export const FAQs: React.FC = () => {
         },
         {
             question: "How can I track my order?",
-            answer: "Once your order is shipped, you can track it by logging into your Supplis.com account and visiting the 'My Orders' section. We also email you a direct tracking link from our courier partner."
+            answer: "Once your order is shipped, you can track it by logging into your Suplis.com account and visiting the 'My Orders' section. We also email you a direct tracking link from our courier partner."
         },
         {
             question: "The powder clumped up. Is it still safe to consume?",

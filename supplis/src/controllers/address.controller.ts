@@ -6,33 +6,11 @@ import {AddressRepository} from '../repositories';
 import {authenticate, AuthenticationBindings, IAuthUser, STRATEGY} from 'loopback4-authentication';
 import {authorize} from 'loopback4-authorization';
 
-type AddressInput = Omit<Address, 'id'> & {zipCode?: string};
-
 export class AddressController {
   constructor(
     @repository(AddressRepository)
     public addressRepository: AddressRepository,
   ) {}
-
-  private normalizeAddressInput(address: Partial<AddressInput>): Partial<AddressInput> {
-    const normalized: Partial<AddressInput> = {...address};
-    const postalCode = normalized.zipCode ?? normalized.pinCode;
-
-    if (postalCode) {
-      normalized.pinCode = postalCode;
-    }
-
-    delete normalized.zipCode;
-    return normalized;
-  }
-
-  private serializeAddress(address: Address): any {
-    return {
-      ...address,
-      zipCode: address.pinCode,
-      pinCode: undefined,
-    };
-  }
 
   @authenticate(STRATEGY.BEARER)
   @authorize({permissions: ['*']})
@@ -42,18 +20,27 @@ export class AddressController {
     content: {'application/json': {schema: {'x-ts-type': Address}}},
   })
   async create(
-    @requestBody() address: AddressInput,
+    @requestBody() address: Omit<Address, 'id' | 'userId'> & {
+      addressLine1?: string;
+    },
     @inject(AuthenticationBindings.CURRENT_USER) currentUser: IAuthUser,
-  ): Promise<any> {
-    const normalizedAddress = this.normalizeAddressInput(address) as AddressInput;
+  ): Promise<Address> {
+    const {addressLine1, ...addressFields} = address;
+    const street = addressFields.street ?? addressLine1;
 
-    if (!normalizedAddress.pinCode) {
-      throw new HttpErrors.UnprocessableEntity('zipCode is required.');
+    if (!addressFields.name || !addressFields.zipCode || !street) {
+      throw new HttpErrors.UnprocessableEntity(
+        'name, addressLine1 (or street), and zipCode are required.',
+      );
     }
 
-    normalizedAddress.userId = currentUser.id as string;
-    const createdAddress = await this.addressRepository.create(normalizedAddress as Omit<Address, 'id'>);
-    return this.serializeAddress(createdAddress);
+    const addressData = {
+      ...addressFields,
+      street,
+      userId: currentUser.id as string,
+    };
+
+    return this.addressRepository.create(addressData);
   }
 
   @authenticate(STRATEGY.BEARER)
@@ -69,12 +56,10 @@ export class AddressController {
   })
   async find(
     @inject(AuthenticationBindings.CURRENT_USER) currentUser: IAuthUser,
-  ): Promise<any[]> {
-    const addresses = await this.addressRepository.find({
+  ): Promise<Address[]> {
+    return this.addressRepository.find({
       where: {userId: currentUser.id as string},
     });
-
-    return addresses.map(address => this.serializeAddress(address));
   }
 
   @authenticate(STRATEGY.BEARER)

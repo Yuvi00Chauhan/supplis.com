@@ -21,6 +21,14 @@ if (require.main === module) {
     rest: {
       port: +(process.env.PORT ?? 3002),
       host: process.env.HOST ?? '127.0.0.1',
+      cors: {
+        origin: 'http://localhost:5173',
+        methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+        preflightContinue: false,
+        optionsSuccessStatus: 204,
+        maxAge: 86400,
+        credentials: true,
+      },
       // The `gracePeriodForClose` provides a graceful close for http/https
       // servers with keep-alive clients. The default value is `Infinity`
       // (don't force-close). If you want to immediately destroy all sockets
